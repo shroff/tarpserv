@@ -6,7 +6,7 @@ LDFLAGS=-lpcap
 
 all: $(BINS)
 
-tarpserv: tarpserv.o
+tarpserv: tarpserv.o packets.o
 
 clean:
 	rm -rf $(BINS)
