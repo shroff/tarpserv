@@ -1,5 +1,5 @@
 BINS=tarpserv
-CFLAGS=-Wall -Werror -ansi -pedantic
+CFLAGS=-Wall -Werror -ansi -pedantic -g
 LDFLAGS=-lpcap
 
 .PHONY: all clean

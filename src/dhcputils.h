@@ -8,5 +8,6 @@ dhcp_option* dhcp_get_option(dhcp_packet *, u_char);
 void dhcp_add_option(dhcp_packet *, dhcp_option *);
 void dhcp_generate_options(dhcp_packet *);
 u_short dhcp_udp_checksum(dhcp_packet *);
+void dhcp_free_stuff(dhcp_packet *packet);
 
 #endif

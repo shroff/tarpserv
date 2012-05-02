@@ -53,6 +53,8 @@ void dhcp_handler(u_char *args,
     const struct pcap_pkthdr *header,
     const u_char *packet) {
   dhcp_option* option;
+  u_short checksum;
+  int i;
 
 	if(header->len != header->caplen) {	/* Incomplete packet */
 		printf("Unequal lengths: should be %d, got %d\n", header->len, header->caplen);
@@ -67,13 +69,19 @@ void dhcp_handler(u_char *args,
   printf("\n");
   option = dhcp_get_option(&reply, 53);
   if(option) {
-    printf("Message Type: %d", option->data[0]);
+    printf("Message Type: %d\n", option->data[0]);
   }
 
+  checksum = reply.udp.udp_sum;
 	reply.udp.udp_sum = 0;
   dhcp_generate_options(&reply);
-	printf("Checksums: %d (original), %d (calculated)\n",
-      reply.udp.udp_sum,
+	printf("Checksums: %.2x (original), %.2x (calculated)\n",
+      checksum,
       dhcp_udp_checksum(&reply));
 
+  for(i=0; i<reply.opLen; i++) {
+    printf("%.2x %.2x %d\n", packet[SIZE_HEADERS + i], reply.ops[i], packet[SIZE_HEADERS + i] == reply.ops[i]);
+  }
+
+  dhcp_free_stuff(&reply);
 }

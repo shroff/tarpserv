@@ -18,17 +18,17 @@ void extract_dhcp(dhcp_packet *packet, const u_char *data, int capture_size) {
   packet->opTail->len = data[1];
   memcpy(packet->opTail->data, data+2, data[1]);
   packet->opTail->next = NULL;
-  packet->opLen += data[1];
+  packet->opLen += data[1]+2;
   packet->opCount++;
   data += data[1]+2;
   while(data[0] != 0xff) {
     packet->opTail->next = (dhcp_option*)malloc(sizeof(dhcp_option));
     packet->opTail = packet->opTail->next;
+    packet->opTail->next = NULL;
     packet->opTail->type = data[0];
     packet->opTail->len = data[1];
     memcpy(packet->opTail->data, data+2, data[1]);
-    packet->opTail->next = NULL;
-    packet->opLen += data[1];
+    packet->opLen += data[1]+2;
     packet->opCount++;
     data += data[1]+2;
   }
@@ -50,9 +50,10 @@ void dhcp_add_option(dhcp_packet *packet, dhcp_option *option) {
 
 void dhcp_generate_options(dhcp_packet *packet) {
   dhcp_option *option = packet->opHead;
-  u_char* ptr= malloc(packet->opLen+1);
+  u_char* ptr;
+  packet->ops = malloc((packet->opLen)+1);
+  ptr = packet->ops;
   ptr[packet->opLen] = '\0';  /* Set the possible pad character to 0 */
-  packet->ops = ptr;
 
   while(option != NULL) {
     ptr[0] = option->type;
@@ -93,4 +94,18 @@ u_short dhcp_udp_checksum(dhcp_packet *packet) {
 	free(pseudo_header);
 
 	return sum;
+}
+
+void dhcp_free_stuff(dhcp_packet *packet) {
+  dhcp_option *ptr = packet->opHead;
+  dhcp_option *temp;
+
+  while(ptr) {
+    temp = ptr->next;
+    free(ptr);
+    ptr = temp;
+  }
+  if(packet->ops) {
+    free(packet->ops);
+  }
 }
