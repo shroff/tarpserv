@@ -1,9 +1,11 @@
 #include "packets.h"
+#include "dhcputils.h"
 #include <stdio.h>
 #include <pcap.h>
 
-#define MAX_CAP_SIZE 2048
+#define MAX_CAP_SIZE 20480
 
+dhcp_packet reply;
 
 /* Function Prototypes */
 pcap_t* tarpserv_open_pcap(char*, char*);
@@ -11,7 +13,7 @@ void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
 
 int main() {
   /* TODO: Do not compile fixed device name */
-  pcap_t* dhcp_session = tarpserv_open_pcap("eth0", "udp and port 6700");
+  pcap_t* dhcp_session = tarpserv_open_pcap("vboxnet0", "udp and port 68");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
 
   return 0;
@@ -50,4 +52,17 @@ pcap_t* tarpserv_open_pcap(char* dev, char* filter) {
 void dhcp_handler(u_char *args,
     const struct pcap_pkthdr *header,
     const u_char *packet) {
+
+	if(header->len != header->caplen) {	/* Incomplete packet */
+		printf("Unequal lengths: should be %d, got %d\n", header->len, header->caplen);
+		return;
+	}
+
+	extract_dhcp(&reply, packet, header->caplen);
+  printf("From: ");
+  print_mac((const u_char*)&(reply.eth.eth_shost), 6);
+  printf("\nTo: ");
+  print_mac((const u_char*)&(reply.eth.eth_dhost), 6);
+  printf("\n");
+
 }
