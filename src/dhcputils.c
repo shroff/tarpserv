@@ -26,3 +26,16 @@ void extract_dhcp(dhcp_packet *packet, const u_char *data, int capture_size) {
     data += data[1]+2;
   }
 }
+
+dhcp_option* get_dhcp_option(dhcp_packet *packet, u_char type) {
+  dhcp_option *option = packet->opHead;
+  while(option != NULL && option->type != type)
+    option = option->next;
+  return option;
+}
+
+void add_dhcp_option(dhcp_packet *, dhcp_option *) {
+  option->next = NULL;
+  packet->opTail->next = option;
+  packet->opTail = option;
+}
