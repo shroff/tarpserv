@@ -70,4 +70,10 @@ void dhcp_handler(u_char *args,
     printf("Message Type: %d", option->data[0]);
   }
 
+	reply.udp.udp_sum = 0;
+  dhcp_generate_options(&reply);
+	printf("Checksums: %d (original), %d (calculated)\n",
+      reply.udp.udp_sum,
+      dhcp_udp_checksum(&reply));
+
 }

@@ -97,6 +97,9 @@ typedef struct dhcp_packet_s {
   dhcp_option *opHead;
   dhcp_option *opTail;
 
+  /* Pointer to the concatenated options. */
+  u_char *ops;
+
   /* This data is purely for accounting purposes */
   int opLen;
   int opCount;
