@@ -79,6 +79,13 @@ typedef struct dhcp_header_s {
   u_char  magic[4];     /* Magic Cookie; 0x63 0x82 0x53 0x63 */
 } dhcp_header;
 
+typedef struct dhcp_option_s {
+  u_char type;
+  u_char len;
+  u_char data[255];
+  struct dhcp_option_s* next;
+} dhcp_option;
+
 /* Actual DHCP packet */
 typedef struct dhcp_packet_s {
   eth_header eth;
@@ -86,12 +93,11 @@ typedef struct dhcp_packet_s {
   udp_header udp;
   dhcp_header dhcp;
 
-  /* In the packet as actual data */
-  u_char *options;
-
-  /* Not in the packet at all */
-  u_int options_len;
+  /* Option data will need to be parsed */
+  dhcp_option *opHead;
+  dhcp_option *opTail;
 } dhcp_packet;
+
 
 /* Function Prototypes */
 void set_ip(ip_address*, u_char, u_char, u_char, u_char);
