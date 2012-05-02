@@ -96,6 +96,10 @@ typedef struct dhcp_packet_s {
   /* Option data will need to be parsed */
   dhcp_option *opHead;
   dhcp_option *opTail;
+
+  /* This data is purely for accounting purposes */
+  int opLen;
+  int opCount;
 } dhcp_packet;
 
 

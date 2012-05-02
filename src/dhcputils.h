@@ -4,7 +4,7 @@
 #include "packets.h"
 
 void extract_dhcp(dhcp_packet *, const u_char *, int);
-dhcp_option* get_dhcp_option(dhcp_packet *, u_char);
-void add_dhcp_option(dhcp_packet *, dhcp_option *);
+dhcp_option* dhcp_get_option(dhcp_packet *, u_char);
+void dhcp_add_option(dhcp_packet *, dhcp_option *);
 
 #endif

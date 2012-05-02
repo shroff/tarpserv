@@ -52,6 +52,7 @@ pcap_t* tarpserv_open_pcap(char* dev, char* filter) {
 void dhcp_handler(u_char *args,
     const struct pcap_pkthdr *header,
     const u_char *packet) {
+  dhcp_option* option;
 
 	if(header->len != header->caplen) {	/* Incomplete packet */
 		printf("Unequal lengths: should be %d, got %d\n", header->len, header->caplen);
@@ -64,5 +65,9 @@ void dhcp_handler(u_char *args,
   printf("\nTo: ");
   print_mac((const u_char*)&(reply.eth.eth_dhost), 6);
   printf("\n");
+  option = dhcp_get_option(&reply, 53);
+  if(option) {
+    printf("Message Type: %d", option->data[0]);
+  }
 
 }
