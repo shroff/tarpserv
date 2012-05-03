@@ -18,12 +18,17 @@ dhcp_lease leases[256];
 pcap_t* tarpserv_open_pcap(char*, char*);
 void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
 void initialize_leases(void);
+void add_options(dhcp_packet*);
 
-char *device = "vboxnet0";
+char *device;
 pcap_t* dhcp_session;
 
-int main() {
-  /* TODO: Do not compile fixed device name */
+int main(int argc, char **argv) {
+  if(argc < 2) {
+    fprintf(stderr, "Usage: %s <device-name>", argv[0]);
+    return 1;
+  }
+  device = argv[1];
   initialize_leases();
   dhcp_session = tarpserv_open_pcap(device, "udp and port 67");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
@@ -67,6 +72,28 @@ int get_lease(int request, u_char* hwaddr) {
   }
 }
 
+void add_options(dhcp_packet* packet) {
+  dhcp_option *option = dhcp_create_option(packet);
+  option->type = 51;
+  option->len = 4;
+  packet->opLen += 4;
+  *((u_int*)(option->data)) = htonl(86400);
+
+  option = dhcp_create_option(packet);
+  option->type = 1;
+  option->len = 4;
+  packet->opLen += 4;
+  option->data[0] = option->data[1] = option->data[2] = 255;
+  option->data[3] = 0;
+
+  option = dhcp_create_option(packet);
+  option->type = 28;
+  option->len = 4;
+  packet->opLen += 4;
+  memcpy(option->data, &packet->ip.ip_src, 4);
+  option->data[3] = 0;
+  
+}
 
 pcap_t* tarpserv_open_pcap(char* dev, char* filter) {
   char errbuf[1000];
@@ -121,6 +148,29 @@ void dhcp_handler(u_char *args,
     printf("Leasing %d\n", lease);
     reply.dhcp.yiaddr.byte4 = lease;
     reply.ip.ip_dst.byte4 = lease;
+
+    dhcp_finalize_packet(&reply);
+    memcpy(buffer, &reply, SIZE_HEADERS);
+    memcpy(buffer+SIZE_HEADERS, reply.ops, reply.opLen);
+	  pcap_inject(dhcp_session, buffer, SIZE_HEADERS + reply.opLen);
+  } else if(option && option->data[0] == 3) { /* DHCPREQUEST */
+    reply.opHead->data[0] = 5;
+
+    option = dhcp_get_option(&request, 50);
+    if(!option) {
+      reply.opHead->data[0] = 6;
+    } else {
+      lease = option->data[3];
+      lease = get_lease(-1, request.eth.eth_shost);
+      dhcp_make_reply_packet(&reply, &request);
+      if(lease == -1) {
+        reply.opHead->data[0] = 6;
+      } else {
+        reply.dhcp.yiaddr.byte4 = lease;
+        reply.ip.ip_dst.byte4 = lease;
+        add_options(&reply);
+      }
+    }
 
     dhcp_finalize_packet(&reply);
     memcpy(buffer, &reply, SIZE_HEADERS);
