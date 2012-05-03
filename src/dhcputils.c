@@ -1,6 +1,7 @@
 #include "dhcputils.h"
 #include "netutils.h"
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <netinet/in.h>
 
@@ -43,17 +44,23 @@ dhcp_option* dhcp_get_option(dhcp_packet *packet, u_char type) {
   return option;
 }
 
-void dhcp_add_option(dhcp_packet *packet, dhcp_option *option) {
+dhcp_option* dhcp_create_option(dhcp_packet *packet) {
+  dhcp_option *option = (dhcp_option*)malloc(sizeof(dhcp_option));
   option->next = NULL;
+  option->len = 0;
+  option->type = 0;
   packet->opTail->next = option;
   packet->opTail = option;
+  packet->opCount++;
+  packet->opLen += 2;
+  return option;
 }
 
 void dhcp_generate_options(dhcp_packet *packet) {
   dhcp_option *option = packet->opHead;
-  u_char* ptr;
-  packet->ops = malloc((packet->opLen)+1);
-  ptr = packet->ops;
+  u_char* ptr = malloc((packet->opLen)+1);
+  /* +1 Just in case for even padding */
+  packet->ops = ptr;
   ptr[packet->opLen] = '\0';  /* Set the possible pad character to 0 */
 
   while(option != NULL) {
@@ -73,7 +80,6 @@ void dhcp_init_packet(dhcp_packet * dhcpacket, const char *dev) {
 
 	dhcpacket->ip.ip_vhl = 0x45;
 	dhcpacket->ip.ip_tos = 0x10;
-	dhcpacket->ip.ip_len = SIZE_HEADERS - SIZE_ETHERNET + dhcpacket->opLen;
 	dhcpacket->ip.ip_id = 0x0000;
 	dhcpacket->ip.ip_off = 0x0000;
 	dhcpacket->ip.ip_ttl = 0x80;
@@ -90,6 +96,28 @@ void dhcp_init_packet(dhcp_packet * dhcpacket, const char *dev) {
 	dhcpacket->dhcp.magic[1] = 0x82;
 	dhcpacket->dhcp.magic[2] = 0x53;
 	dhcpacket->dhcp.magic[3] = 0x63;
+
+  dhcpacket->opHead = (dhcp_option*)malloc(sizeof(dhcp_option));
+  dhcpacket->opTail = dhcpacket->opHead;
+  dhcpacket->opTail->type = 53;
+  dhcpacket->opTail->len = 1;
+  dhcpacket->opTail->next = NULL;
+  dhcpacket->opCount = 1;
+  dhcpacket->opLen = 4;
+}
+
+void dhcp_finalize_packet(dhcp_packet *packet) {
+  packet->ip.ip_len = SIZE_HEADERS - SIZE_ETHERNET + packet->opLen;
+  packet->udp.len = htons(packet->ip.ip_len - SIZE_IP);
+  packet->ip.ip_len = htons(packet->ip.ip_len);
+
+  packet->udp.udp_sum = 0;
+  dhcp_generate_options(packet);
+  packet->udp.udp_sum = dhcp_udp_checksum(packet);
+
+  packet->ip.ip_sum = 0;
+	packet->ip.ip_sum =
+      checksum((u_short*)(&(packet->ip.ip_vhl)), IP_HL(&(packet->ip))<<1);
 }
 
 u_short dhcp_udp_checksum(dhcp_packet *packet) {
@@ -122,10 +150,28 @@ u_short dhcp_udp_checksum(dhcp_packet *packet) {
 
 	return sum;
 }
+void dhcp_debug_packet(dhcp_packet *packet) {
+  dhcp_option *option = packet->opHead;
+  int i;
+  printf ("Options count: %d\n", packet->opCount);
+  printf ("Options length: %d\n", packet->opLen);
+  printf ("Options:\n");
+  while(option) {
+    printf("  Type: %d\n", option->type);
+    printf("  Length: %d\n", option->len);
+    printf("  Data:");
+    for(i=0; i<option->len; i++) {
+      printf("%.2x ", option->data[i]);
+    }
+    printf("\n");
+    option = option->next;
+  }
+}
 
 void dhcp_free_stuff(dhcp_packet *packet) {
   dhcp_option *ptr = packet->opHead;
   dhcp_option *temp;
+  packet->opHead = NULL;
 
   while(ptr) {
     temp = ptr->next;
@@ -134,5 +180,6 @@ void dhcp_free_stuff(dhcp_packet *packet) {
   }
   if(packet->ops) {
     free(packet->ops);
+    packet->ops = NULL;
   }
 }
