@@ -1,10 +1,12 @@
 #include "packets.h"
-#include <stdio.h>
-#include <pcap.h>
 #include "dhcputils.h"
+#include <stdio.h>
+#include <string.h>
+#include <pcap.h>
 
 #define MAX_CAP_SIZE 20480
 
+u_char buffer[MAX_CAP_SIZE];
 dhcp_packet request, reply;
 
 /* Function Prototypes */
@@ -12,10 +14,11 @@ pcap_t* tarpserv_open_pcap(char*, char*);
 void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
 
 char *device = "vboxnet0";
+pcap_t* dhcp_session;
 
 int main() {
   /* TODO: Do not compile fixed device name */
-  pcap_t* dhcp_session = tarpserv_open_pcap(device, "udp and port 67");
+  dhcp_session = tarpserv_open_pcap(device, "udp and port 67");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
 
   return 0;
@@ -75,8 +78,26 @@ void dhcp_handler(u_char *args,
   if(option && option->data[0] == 1) { /* DISCOVER */
     reply.opHead->data[0] = 2;
     option = dhcp_create_option(&reply);
+    option->type = 54;
+    option->len = 4;
+    reply.opLen += 4;
+    memcpy(option->data, (void*)&reply.ip.ip_src, 4);
+
+    /* Copy source MAC from request */
+    memcpy(&reply.eth.eth_dhost, &request.eth.eth_shost, 6);
+    memcpy(&reply.dhcp.chaddr, &request.eth.eth_shost, 6);
+    /* Copy transaction ID from request */
+    memcpy(&reply.dhcp.trans_id, &request.dhcp.trans_id, 4);
+
+    /* Assign IP address */
+    memcpy(&reply.dhcp.yiaddr, (void*)&reply.ip.ip_src, 4);
+    reply.dhcp.yiaddr.byte4 = 10;
+    memcpy(&reply.ip.ip_dst, (void*)&reply.dhcp.yiaddr, 4);
 
     dhcp_finalize_packet(&reply);
+    memcpy(buffer, &reply, SIZE_HEADERS);
+    memcpy(buffer+SIZE_HEADERS, reply.ops, reply.opLen);
+	  pcap_inject(dhcp_session, buffer, SIZE_HEADERS + reply.opLen);
   }
 
   printf("Checksum: %.4x (initial), %.4x (calculated)\n", 
