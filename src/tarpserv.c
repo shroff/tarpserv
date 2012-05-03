@@ -5,7 +5,7 @@
 
 #define MAX_CAP_SIZE 20480
 
-dhcp_packet reply;
+dhcp_packet request, reply;
 
 /* Function Prototypes */
 pcap_t* tarpserv_open_pcap(char*, char*);
@@ -13,7 +13,7 @@ void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
 
 int main() {
   /* TODO: Do not compile fixed device name */
-  pcap_t* dhcp_session = tarpserv_open_pcap("vboxnet0", "udp and port 68");
+  pcap_t* dhcp_session = tarpserv_open_pcap("vboxnet0", "udp and port 67");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
 
   return 0;
@@ -61,23 +61,21 @@ void dhcp_handler(u_char *args,
 		return;
 	}
 
-	extract_dhcp(&reply, packet, header->caplen);
+	extract_dhcp(&request, packet, header->caplen);
   printf("From: ");
-  print_mac((const u_char*)&(reply.eth.eth_shost), 6);
+  print_mac((const u_char*)&(erequest.eth.eth_shost), 6);
   printf("\nTo: ");
-  print_mac((const u_char*)&(reply.eth.eth_dhost), 6);
+  print_mac((const u_char*)&(request.eth.eth_dhost), 6);
   printf("\n");
-  option = dhcp_get_option(&reply, 53);
-  if(option) {
-    printf("Message Type: %d\n", option->data[0]);
-  }
+  option = dhcp_get_option(&request, 53);
 
-  checksum = reply.udp.udp_sum;
-	reply.udp.udp_sum = 0;
-  dhcp_generate_options(&reply);
-	printf("Checksums: %.2x (original), %.2x (calculated)\n",
+  checksum = request.udp.udp_sum;
+	request.udp.udp_sum = 0;
+  dhcp_generate_options(&request);
+	printf("Checksums: %.4x (original), %.4x (calculated), %.4x(diff)\n",
       checksum,
-      dhcp_udp_checksum(&reply));
+      dhcp_udp_checksum(&reply),
+      dhcp_udp_checksum(&reply) - checksum);
 
   for(i=0; i<reply.opLen; i++) {
     printf("%.2x %.2x %d\n", packet[SIZE_HEADERS + i], reply.ops[i], packet[SIZE_HEADERS + i] == reply.ops[i]);

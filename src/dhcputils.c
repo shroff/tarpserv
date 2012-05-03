@@ -1,4 +1,5 @@
 #include "dhcputils.h"
+#include "netutils.h"
 #include <string.h>
 #include <stdlib.h>
 #include <netinet/in.h>
@@ -63,6 +64,32 @@ void dhcp_generate_options(dhcp_packet *packet) {
     option = option->next;
   }
   ptr[0] = 0xff;
+}
+void dhcp_init_packet(dhcp_packet * dhcpacket, const char *dev) {
+  memset(dhcpacket, 0, SIZE_HEADERS);
+	read_iface_config((u_char *)dhcpacket->eth.eth_shost,
+      (int *)&dhcpacket->ip.ip_src, dev);
+	dhcpacket->eth.eth_type = htons(0x0800);
+
+	dhcpacket->ip.ip_vhl = 0x45;
+	dhcpacket->ip.ip_tos = 0x10;
+	dhcpacket->ip.ip_len = SIZE_HEADERS - SIZE_ETHERNET + dhcpacket->opLen;
+	dhcpacket->ip.ip_id = 0x0000;
+	dhcpacket->ip.ip_off = 0x0000;
+	dhcpacket->ip.ip_ttl = 0x80;
+	dhcpacket->ip.ip_p = 0x11;
+  dhcpacket->ip.ip_sum = 0;
+
+	dhcpacket->udp.sport = htons(0x0043);
+	dhcpacket->udp.dport = htons(0x0044);
+	
+	dhcpacket->dhcp.msg_type = 0x02;
+	dhcpacket->dhcp.hw_type = 0x01;
+	dhcpacket->dhcp.hw_len = 0x06;
+	dhcpacket->dhcp.magic[0] = 0x63;
+	dhcpacket->dhcp.magic[1] = 0x82;
+	dhcpacket->dhcp.magic[2] = 0x53;
+	dhcpacket->dhcp.magic[3] = 0x63;
 }
 
 u_short dhcp_udp_checksum(dhcp_packet *packet) {
