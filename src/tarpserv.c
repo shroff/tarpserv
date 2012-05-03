@@ -1,28 +1,72 @@
 #include "packets.h"
 #include "dhcputils.h"
+#include "netutils.h"
 #include <stdio.h>
 #include <string.h>
 #include <pcap.h>
+#include <netinet/in.h>
+#include <time.h>
 
 #define MAX_CAP_SIZE 20480
 
 u_char buffer[MAX_CAP_SIZE];
 dhcp_packet request, reply;
 
+dhcp_lease leases[256];
+
 /* Function Prototypes */
 pcap_t* tarpserv_open_pcap(char*, char*);
 void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
+void initialize_leases(void);
 
 char *device = "vboxnet0";
 pcap_t* dhcp_session;
 
 int main() {
   /* TODO: Do not compile fixed device name */
+  initialize_leases();
   dhcp_session = tarpserv_open_pcap(device, "udp and port 67");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
 
   return 0;
 }
+
+void initialize_leases() {
+  int i;
+  u_char hwaddr[6];
+
+  for(i=0; i<255; i++) {
+    leases[i].time = 0;
+    leases[i].dyn = 1;
+    leases[i].ticketfile = NULL;
+  }
+
+	read_iface_config(hwaddr, &i, device);
+  i = htonl(i) & 0xff;
+  /* Always mark own IP address and subnet IP address (.0) as used */
+  leases[i].time = (unsigned long) -1l;
+  leases[i].dyn = 0;
+  leases[0].time = (unsigned long) -1l;
+  leases[0].dyn = 0;
+}
+
+int get_lease(int request, u_char* hwaddr) {
+  time_t seconds = time(NULL);
+  if(request == -1) { /* Search for IP address */
+    for(request = 1; request < 255; request++) {
+      if(leases[request].dyn && seconds -  leases[request].time > 86400) {
+        return request;
+      }
+    }
+    return -1;
+  } else { /* Check to see if the requested IP can be assigned.*/
+    if(!strncmp((char*)hwaddr, (char*)leases[request].hwaddr, 6)) {
+      return request;
+    }
+    return -1;
+  }
+}
+
 
 pcap_t* tarpserv_open_pcap(char* dev, char* filter) {
   char errbuf[1000];
@@ -58,7 +102,7 @@ void dhcp_handler(u_char *args,
     const struct pcap_pkthdr *header,
     const u_char *packet) {
   dhcp_option* option;
-  u_short checksum;
+  int lease;
 
 	if(header->len != header->caplen) {	/* Incomplete packet */
 		printf("Unequal lengths: should be %d, got %d\n", header->len, header->caplen);
@@ -66,42 +110,23 @@ void dhcp_handler(u_char *args,
 	}
 
 	extract_dhcp(&request, packet, header->caplen);
-  printf("From: ");
-  print_mac((const u_char*)&(request.eth.eth_shost), 6);
-  printf("\nTo: ");
-  print_mac((const u_char*)&(request.eth.eth_dhost), 6);
-  printf("\n");
   option = dhcp_get_option(&request, 53);
 
-  checksum = request.udp.udp_sum;
   dhcp_init_packet(&reply, device);
   if(option && option->data[0] == 1) { /* DISCOVER */
     reply.opHead->data[0] = 2;
-    option = dhcp_create_option(&reply);
-    option->type = 54;
-    option->len = 4;
-    reply.opLen += 4;
-    memcpy(option->data, (void*)&reply.ip.ip_src, 4);
 
-    /* Copy source MAC from request */
-    memcpy(&reply.eth.eth_dhost, &request.eth.eth_shost, 6);
-    memcpy(&reply.dhcp.chaddr, &request.eth.eth_shost, 6);
-    /* Copy transaction ID from request */
-    memcpy(&reply.dhcp.trans_id, &request.dhcp.trans_id, 4);
-
-    /* Assign IP address */
-    memcpy(&reply.dhcp.yiaddr, (void*)&reply.ip.ip_src, 4);
-    reply.dhcp.yiaddr.byte4 = 10;
-    memcpy(&reply.ip.ip_dst, (void*)&reply.dhcp.yiaddr, 4);
+    dhcp_make_reply_packet(&reply, &request);
+    lease = get_lease(-1, request.eth.eth_shost);
+    printf("Leasing %d\n", lease);
+    reply.dhcp.yiaddr.byte4 = lease;
+    reply.ip.ip_dst.byte4 = lease;
 
     dhcp_finalize_packet(&reply);
     memcpy(buffer, &reply, SIZE_HEADERS);
     memcpy(buffer+SIZE_HEADERS, reply.ops, reply.opLen);
 	  pcap_inject(dhcp_session, buffer, SIZE_HEADERS + reply.opLen);
   }
-
-  printf("Checksum: %.4x (initial), %.4x (calculated)\n", 
-      checksum, reply.udp.udp_sum);
 
   dhcp_free_stuff(&request);
   dhcp_free_stuff(&reply);

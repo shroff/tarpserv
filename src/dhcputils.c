@@ -56,6 +56,26 @@ dhcp_option* dhcp_create_option(dhcp_packet *packet) {
   return option;
 }
 
+void dhcp_make_reply_packet(dhcp_packet *reply, const dhcp_packet *request) {
+  dhcp_option* option = dhcp_create_option(reply);
+
+  /* DHCP Server Identifier */
+  option->type = 54;
+  option->len = 4;
+  reply->opLen += 4;
+  memcpy(option->data, (void*)&reply->ip.ip_src, 4);
+
+  /* Copy source MAC from request */
+  memcpy(&reply->eth.eth_dhost, &request->eth.eth_shost, 6);
+  memcpy(&reply->dhcp.chaddr, &request->eth.eth_shost, 6);
+  /* Copy transaction ID from request */
+  memcpy(&reply->dhcp.trans_id, &request->dhcp.trans_id, 4);
+
+  /* Assign IP address */
+  memcpy(&reply->dhcp.yiaddr, (void*)&reply->ip.ip_src, 4);
+  memcpy(&reply->ip.ip_dst, (void*)&reply->dhcp.yiaddr, 4);
+}
+
 void dhcp_generate_options(dhcp_packet *packet) {
   dhcp_option *option = packet->opHead;
   u_char* ptr = malloc((packet->opLen)+1);
