@@ -1,4 +1,4 @@
-BINS=tarpserv
+BINS=tarpserv tarpclient
 CFLAGS=-Wall -Werror -pedantic -g
 LDFLAGS=-lpcap -lssl -lcrypto
 
@@ -7,6 +7,7 @@ LDFLAGS=-lpcap -lssl -lcrypto
 all: $(BINS)
 
 tarpserv: tarpserv.o packets.o dhcputils.o netutils.o tarp_lta.o
+tarpclient: tarpclient.o packets.o dhcputils.o netutils.o tarp_lta.o
 
 clean:
 	rm -rf $(BINS)
