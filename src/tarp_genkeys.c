@@ -49,8 +49,8 @@ int main(int argc,char *argv[]) {
   char *priv_file_name;
   char *pub_file_name;
 
-  char priv_suffix[] = ".pub";
-  char pub_suffix[] = ".priv";
+  char priv_suffix[] = ".priv";
+  char pub_suffix[] = ".pub";
   int len;
 
   if (argc != 4) {
