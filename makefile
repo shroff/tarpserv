@@ -1,4 +1,4 @@
-BINS=tarpserv tarpclient
+BINS=tarpserv tarpclient tarp_genkeys
 ODIR=obj
 SDIR=src
 CFLAGS=-Wall -Werror -pedantic -g
@@ -12,6 +12,9 @@ tarpserv: $(ODIR)/tarpserv.o $(ODIR)/packets.o $(ODIR)/dhcputils.o $(ODIR)/netut
 	$(CC) $(LDFLAGS) -o $@ $^
 tarpclient: $(ODIR)/tarpclient.o $(ODIR)/packets.o $(ODIR)/dhcputils.o $(ODIR)/netutils.o
 	$(CC) $(LDFLAGS) -o $@ $^
+tarp_genkeys: $(ODIR)/tarp_genkeys.o
+	$(CC) $(LDFLAGS) -o $@ $^
+
 
 clean:
 	rm -rf $(BINS)

@@ -2,3 +2,6 @@
 *.o
 tarpserv
 tarpclient
+tarp_genkeys
+*.pub
+*.priv
