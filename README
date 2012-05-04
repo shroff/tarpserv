@@ -1,0 +1,81 @@
+Copyright (C) 2012 Abhishek Shroff
+
+This file is the README file for tarpserv
+
+tarpserv is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+tarpserv is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+
+============
+INTRODUCTION
+============
+
+tarpserv is a lightweight extensible DHCP server. It was initially created
+to distribute tarp tickets along with DHCP leases in order to mitigate
+ARP cache poisoning attacks. This technique is based on the 2005 ACSAC paper
+by Wesam Lootah, William Enck, and Patrick McDaniel.
+
+Tarpserv is meant to be completely backward compatible with DHCP. It sends an
+extra option with code 240 (typcially reserved for private use) to send the
+ticket. If the ticket exceeds the maximum of 255 bytes allowed in one option, it
+is split into multiple consecutive options. tarpclient receives the packet,
+scans for option code 240, and use the contents of that packet to write out to
+the ticket file.
+
+tarpserv uses pcap to listen to and inject raw packets on the network.
+
+To learn more about tarp, go to http://siis.cse.psu.edu/tools.html
+
+
+============
+INSTALLATION
+============
+
+tarpserv makes use of the openssl and pcap to carry out its functions. These
+libraries must be installed (with develpment headers) in order to be able to
+compile tarpserv. Additionally, it also requires a properly functioning tarp
+installation on client computers, otherwise it will not provide any additional
+functionality.
+
+
+===============
+VULNERABILITIES
+===============
+
+tarpserv relies on tarp to provide the actual functionality of protection
+against ARP cache poisoning. Though the ticket exchange may not be vulnerable to
+those, any vulnerabilities found in tarpe would lessen the integrity of the
+network anyway.
+
+Additionally, tarpserv may be vulnerable to DoS attacks. The server generates a
+new ticket for each request, and does not cache it. You could limit this in one
+of two way:
+
+1. You could rate-limit packets from certain hardware sources
+
+2. You could cache the ticket when you send out the lease so that you do not
+have to re-generate it for the same host frequently.
+
+
+===========
+LIMITATIONS
+===========
+
+In it's current state, tarpserv is fairly limited in its configurability. It
+does not allow for a lot of options, all of which are hard-coded. Adding more
+options is just a matter of parsing a configuration file which was not the
+primary focus as of right now.
+
+
