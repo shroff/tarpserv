@@ -6,7 +6,6 @@
 
 typedef struct dhcp_lease_s {
   u_char hwaddr[6];
-  ip_address ipaddr;
   char *ticketfile;
   time_t time;
   u_char dyn;

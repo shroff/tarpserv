@@ -1,6 +1,7 @@
 #include "packets.h"
 #include "dhcputils.h"
 #include "netutils.h"
+#include "tarp_lta.h"
 #include <stdio.h>
 #include <string.h>
 #include <pcap.h>
@@ -20,15 +21,17 @@ void dhcp_handler(u_char*, const struct pcap_pkthdr*, const u_char*);
 void initialize_leases(void);
 void add_options(dhcp_packet*);
 
+char *key;
 char *device;
 pcap_t* dhcp_session;
 
 int main(int argc, char **argv) {
-  if(argc < 2) {
-    fprintf(stderr, "Usage: %s <device-name>", argv[0]);
+  if(argc < 3) {
+    fprintf(stderr, "Usage: %s <device-name> <tarp-private-key>", argv[0]);
     return 1;
   }
   device = argv[1];
+  key = argv[2];
   initialize_leases();
   dhcp_session = tarpserv_open_pcap(device, "udp and port 67");
   pcap_loop(dhcp_session, -1, dhcp_handler, NULL);
@@ -130,6 +133,9 @@ void dhcp_handler(u_char *args,
     const u_char *packet) {
   dhcp_option* option;
   int lease;
+  int len;
+  int done;
+  char* ticket;
 
 	if(header->len != header->caplen) {	/* Incomplete packet */
 		printf("Unequal lengths: should be %d, got %d\n", header->len, header->caplen);
@@ -165,10 +171,23 @@ void dhcp_handler(u_char *args,
       dhcp_make_reply_packet(&reply, &request);
       if(lease == -1) {
         reply.opHead->data[0] = 6;
-      } else {
+      } else {    /* Lease is considered granted by this point. Update mapping*/
+        leases[lease].time = time(NULL);
+        memcpy(leases[lease].hwaddr, request.eth.eth_shost, 6);
         reply.dhcp.yiaddr.byte4 = lease;
         reply.ip.ip_dst.byte4 = lease;
         add_options(&reply);
+        /* TODO: Generate, asssign, and send ticket. */
+        ticket = tarp_create_ticket(reply.eth.eth_dhost, &reply.ip.ip_dst, key);
+        len = strlen(ticket);
+        printf("Ticket: %d\n%s\n" , len, ticket);
+        for(done=0; done<len; done += 255) {
+          option = dhcp_create_option(&reply);
+          option->type = 240;
+          option->len = (len-done > 255) ? 255 : (len-done);
+          reply.opLen += option->len;
+          memcpy(option->data, ticket+done, option->len);
+        }
       }
     }
 
